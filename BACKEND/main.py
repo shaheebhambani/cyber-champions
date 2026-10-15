@@ -5,9 +5,16 @@ import json
 import sqlite3
 import uuid
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
+from fcm_notifications import (
+    init_notification_storage,
+    notification_router,
+    optional_firebase_user,
+    send_suspicious_fraud_alert,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "securewealth.db"
@@ -75,6 +82,8 @@ def init_db():
 
 
 init_db()
+init_notification_storage(DB_PATH)
+app.include_router(notification_router)
 
 
 class TransactionCreate(BaseModel):
@@ -220,7 +229,10 @@ def dashboard():
 
 
 @app.post("/fraud/check")
-def check_fraud(payment: PaymentRequest):
+def check_fraud(
+    payment: PaymentRequest,
+    authorization: Optional[str] = Header(default=None),
+):
     score = 0
     reasons = []
     categories = []
@@ -272,6 +284,12 @@ def check_fraud(payment: PaymentRequest):
         db.execute("INSERT INTO fraud_assessments (id,amount,payee_id,decision,risk_level,risk_score,request_json,response_json,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
                    (str(uuid.uuid4()), payment.amount, payment.payee_id, decision, risk_level, score,
                     payment.model_dump_json(), json.dumps(result), result["evaluated_at"]))
+    authenticated_user = optional_firebase_user(authorization)
+    if decision == "BLOCK" and authenticated_user:
+        # This follows the existing rule-engine decision and does not alter scoring.
+        # Delivery errors are contained in the notification service so fraud results
+        # remain available even if FCM is temporarily unavailable.
+        send_suspicious_fraud_alert(authenticated_user)
     return result
 
 

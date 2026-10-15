@@ -21,6 +21,10 @@ import {
 } from "react-native-safe-area-context";
 
 import { styles } from "./settingsStyles";
+import {
+  disableWebPushNotifications,
+  enableWebPushNotifications,
+} from "@/services/webPushService";
 
 export default function SettingsScreen() {
   const [biometricLogin, setBiometricLogin] =
@@ -36,7 +40,25 @@ export default function SettingsScreen() {
     useState(true);
 
   const [fraudAlerts, setFraudAlerts] =
-    useState(true);
+    useState(false);
+
+  const handleFraudAlertsChange = async (enabled: boolean) => {
+    if (!enabled) {
+      setFraudAlerts(false);
+      const result = await disableWebPushNotifications();
+      if (result.status === "error") {
+        Alert.alert("Browser alerts", result.message);
+      }
+      return;
+    }
+
+    const result = await enableWebPushNotifications();
+    setFraudAlerts(result.status === "enabled");
+
+    if (result.status !== "enabled") {
+      Alert.alert("Browser fraud alerts", result.message);
+    }
+  };
 
   return (
     <SafeAreaView
@@ -114,11 +136,11 @@ export default function SettingsScreen() {
           <SettingsSwitchItem
             icon="shield-alert-outline"
             title="Fraud Alerts"
-            subtitle="Receive critical Twin Shield warnings"
+            subtitle="Allow generic browser warnings when suspicious activity needs review"
             iconColor="#DC2626"
             iconBackground="#FEF2F2"
             value={fraudAlerts}
-            onValueChange={setFraudAlerts}
+            onValueChange={handleFraudAlertsChange}
           />
         </View>
 

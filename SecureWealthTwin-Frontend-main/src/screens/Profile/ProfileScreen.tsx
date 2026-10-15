@@ -20,6 +20,7 @@ import {
 } from "react-native-safe-area-context";
 
 import { styles } from "./profileStyles";
+import { disableWebPushNotifications } from "@/services/webPushService";
 
 export default function ProfileScreen() {
   const handleLogout = () => {
@@ -34,7 +35,7 @@ export default function ProfileScreen() {
       {
         text: "Log Out",
         style: "destructive",
-        onPress: () => {
+        onPress: async () => {
           /*
             Temporary frontend logout.
 
@@ -44,6 +45,8 @@ export default function ProfileScreen() {
             3. Reset user state
             4. Redirect to authentication
           */
+
+          await disableWebPushNotifications();
 
           router.replace(
             "/(auth)/login" as any

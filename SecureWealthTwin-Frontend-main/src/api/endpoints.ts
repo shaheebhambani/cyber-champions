@@ -15,6 +15,8 @@ export const ENDPOINTS = {
 
   NOTIFICATIONS: "/notifications",
 
+  NOTIFICATION_DEVICES: "/notifications/devices",
+
   AI: {
     CHAT: "/ai/chat",
   },
