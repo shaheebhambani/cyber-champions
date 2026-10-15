@@ -608,4 +608,169 @@ export default StyleSheet.create({
     fontSize: 10,
     marginLeft: 5,
   },
+
+  /* =========================
+      CURRENCY SELECTOR
+  ========================= */
+
+  currencySelectorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+  },
+
+  currencySelectorLabel: {
+    fontSize: 12,
+    color: "#64748B",
+    marginRight: 6,
+  },
+
+  currencySelectorButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: "#F1F5F9",
+    marginRight: 6,
+  },
+
+  currencySelectorButtonActive: {
+    backgroundColor: "#2563EB",
+  },
+
+  currencySelectorText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+
+  /* =========================
+      CONVERSION INFO
+  ========================= */
+
+  conversionInfoContainer: {
+    marginTop: 8,
+    alignItems: "center",
+  },
+
+  conversionInfoText: {
+    fontSize: 12,
+    color: "#0F172A",
+  },
+
+  conversionInfoLoadingText: {
+    fontSize: 10,
+    color: "#64748B",
+    fontStyle: "italic",
+  },
+
+  conversionInfoErrorText: {
+    fontSize: 10,
+    color: "#EF4444",
+  },
+
+  /* =========================
+      PROFILE CARD
+  ========================= */
+
+  profileCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 24,
+
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    elevation: 3,
+  },
+
+  profileHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+
+  profileTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+    marginLeft: 8,
+  },
+
+  profileRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+
+  profileLabel: {
+    fontSize: 11,
+    color: "#64748B",
+  },
+
+  profileValue: {
+    fontSize: 12,
+    color: "#0F172A",
+    fontWeight: "500",
+    textAlign: "right",
+  },
+
+  /* =========================
+      VERIFICATION
+  ========================= */
+
+  verificationRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+
+  verificationLabel: {
+    fontSize: 11,
+    color: "#64748B",
+  },
+
+  verificationValue: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#0F172A",
+  },
+
+  verificationValueVerified: {
+    color: "#10B981",
+  },
+
+  verificationValueNotVerified: {
+    color: "#EF4444",
+  },
+
+  verificationActionButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+  },
+
+  verificationActionText: {
+    fontSize: 10,
+    color: "#2563EB",
+    fontWeight: "600",
+  },
+
+  noteCounterError: {
+    fontSize: 9,
+    color: "#EF4444",
+    fontStyle: "italic",
+  },
 });

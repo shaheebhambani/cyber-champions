@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { BeneficiaryProvider } from "@/context/BeneficiaryContext";
+import { WebPushAutoSync } from "@/components/WebPushAutoSync";
 
 export default function RootLayout() {
   return (
@@ -11,6 +12,8 @@ export default function RootLayout() {
       <SafeAreaProvider>
 
         <BeneficiaryProvider>
+
+          <WebPushAutoSync />
 
           <StatusBar style="dark" />
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -23,6 +24,9 @@ import { router } from "expo-router";
 import {
   useBeneficiaries,
 } from "@/context/BeneficiaryContext";
+
+import { authService } from "@/services/authService";
+import { verificationService } from "@/services/verificationService";
 
 import styles from "./styles";
 
@@ -40,11 +44,20 @@ export default function TransferMoneyScreen() {
     selectBeneficiary,
   } = useBeneficiaries();
 
-  const [amount, setAmount] =
-    useState("");
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [currency, setCurrency] = useState("INR"); // INR, USD, EUR, GBP
+  const [convertedAmountInr, setConvertedAmountInr] = useState(0);
+  const [conversionRate, setConversionRate] = useState(1);
+  const [loadingConversion, setLoadingConversion] = useState(false);
+  const [conversionError, setConversionError] = useState<string | null>(null);
 
-  const [note, setNote] =
-    useState("");
+  const [profile, setProfile] = useState<{ email: string | null; phone_number: string | null; uid: string } | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  const [emailVerification, setEmailVerification] = useState<{ verified: boolean; checking: boolean } | null>(null);
+  const [phoneVerification, setPhoneVerification] = useState<{ verified: boolean; checking: boolean } | null>(null);
 
   const numericAmount =
     Number(amount || 0);
@@ -64,38 +77,122 @@ export default function TransferMoneyScreen() {
     setAmount(cleaned);
   };
 
+  const handleCurrencyChange = (selectedCurrency: string) => {
+    setCurrency(selectedCurrency);
+    // Trigger conversion
+    convertAmountToInr();
+  };
+
+  const convertAmountToInr = async () => {
+    if (numericAmount === 0 || currency === "INR") {
+      setConvertedAmountInr(numericAmount);
+      setConversionRate(1);
+      setConversionError(null);
+      return;
+    }
+
+    setLoadingConversion(true);
+    setConversionError(null);
+    try {
+      const conversionResponse = await verificationService.convertAmount(
+        numericAmount,
+        currency,
+        "INR"
+      );
+      setConvertedAmountInr(conversionResponse.converted_amount);
+      setConversionRate(conversionResponse.converted_amount / numericAmount);
+    } catch (err: any) {
+      setConversionError(err?.message ?? "Failed to convert currency");
+      setConvertedAmountInr(0);
+      setConversionRate(0);
+    } finally {
+      setLoadingConversion(false);
+    }
+  };
+
+  useEffect(() => {
+    // Fetch user profile
+    const fetchProfile = async () => {
+      setLoadingProfile(true);
+      setProfileError(null);
+      try {
+        const profileData = await authService.getProfile();
+        setProfile(profileData);
+      } catch (err: any) {
+        setProfileError(err?.message ?? "Failed to fetch profile");
+        setProfile(null);
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  useEffect(() => {
+    // Verify email if we have profile
+    if (profile?.email) {
+      const verifyEmail = async () => {
+        setEmailVerification(prev => ({ ...(prev ?? {}), checking: true }));
+        try {
+          const emailResult = await verificationService.verifyEmail(profile.email);
+          setEmailVerification({ verified: emailResult.deliverable, checking: false });
+        } catch (err: any) {
+          setEmailVerification({ verified: false, checking: false });
+          console.error("Email verification failed:", err);
+        }
+      };
+      verifyEmail();
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    // Verify phone if we have profile
+    if (profile?.phone_number) {
+      const verifyPhone = async () => {
+        setPhoneVerification(prev => ({ ...(prev ?? {}), checking: true }));
+        try {
+          const phoneResult = await verificationService.verifyPhone(profile.phone_number);
+          setPhoneVerification({ verified: phoneResult.valid, checking: false });
+        } catch (err: any) {
+          setPhoneVerification({ verified: false, checking: false });
+          console.error("Phone verification failed:", err);
+        }
+      };
+      verifyPhone();
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    // Re-run conversion when amount or currency changes
+    if (amount !== "") {
+      convertAmountToInr();
+    }
+  }, [amount, currency]);
+
   const handleContinue = () => {
     if (!canContinue || !selectedBeneficiary) {
       return;
     }
 
-    /*
-      Part 2:
-      This will navigate to Review Transfer and pass:
-      - amount
-      - beneficiary
-      - note
-      - source account
-    */
+    // Use the converted INR amount for the transfer
+    const transferAmountInr = convertedAmountInr;
 
-      router.push({
-    pathname: "/transfer/review",
-    params: {
-      amount: numericAmount.toString(),
-
-      beneficiaryName:
-        selectedBeneficiary.name,
-
-      beneficiaryBank:
-        selectedBeneficiary.bank,
-
-      beneficiaryAccount:
-        selectedBeneficiary.account,
-
-      note: note,
-    },
-  } as any);
-};
+    router.push({
+      pathname: "/transfer/review",
+      params: {
+        amount: transferAmountInr.toString(),
+        beneficiaryName: selectedBeneficiary.name,
+        beneficiaryBank: selectedBeneficiary.bank,
+        beneficiaryAccount: selectedBeneficiary.account,
+        beneficiaryId: selectedBeneficiary.id,
+        note: note,
+        // Also send the original currency and amount for display in the review screen if needed
+        originalAmount: amount,
+        originalCurrency: currency,
+      },
+    } as any);
+  };
 
   return (
     <>
@@ -296,6 +393,76 @@ export default function TransferMoneyScreen() {
                   );
                 })}
               </View>
+
+              {/* Currency Selector */}
+              {currency !== "INR" && (
+                <View style={styles.currencySelectorContainer}>
+                  <Text style={styles.currencySelectorLabel}>
+                    Currency:
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={[
+                      styles.currencySelectorButton,
+                      currency === "USD" && styles.currencySelectorButtonActive,
+                      currency === "EUR" && styles.currencySelectorButtonActive,
+                      currency === "GBP" && styles.currencySelectorButtonActive,
+                    ]}
+                    onPress={() => handleCurrencyChange("USD")}
+                  >
+                    <Text style={styles.currencySelectorText}>USD</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={[
+                      styles.currencySelectorButton,
+                      currency === "USD" && styles.currencySelectorButtonActive,
+                      currency === "EUR" && styles.currencySelectorButtonActive,
+                      currency === "GBP" && styles.currencySelectorButtonActive,
+                    ]}
+                    onPress={() => handleCurrencyChange("EUR")}
+                  >
+                    <Text style={styles.currencySelectorText}>EUR</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={[
+                      styles.currencySelectorButton,
+                      currency === "USD" && styles.currencySelectorButtonActive,
+                      currency === "EUR" && styles.currencySelectorButtonActive,
+                      currency === "GBP" && styles.currencySelectorButtonActive,
+                    ]}
+                    onPress={() => handleCurrencyChange("GBP")}
+                  >
+                    <Text style={styles.currencySelectorText}>GBP</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={[
+                      styles.currencySelectorButton,
+                      currency === "INR" && styles.currencySelectorButtonActive,
+                    ]}
+                    onPress={() => handleCurrencyChange("INR")}
+                  >
+                    <Text style={styles.currencySelectorText}>INR</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Conversion Info */}
+              {currency !== "INR" && conversionRate > 0 && (
+                <View style={styles.conversionInfoContainer}>
+                  <Text style={styles.conversionInfoText}>
+                    {amount} {currency} = ₹{convertedAmountInr.toLocaleString("en-IN")}
+                    {loadingConversion && (
+                      <Text style={styles.conversionInfoLoadingText}> (calculating...)</Text>
+                    )}
+                    {!loadingConversion && conversionError && (
+                      <Text style={styles.conversionInfoErrorText}> ({conversionError})</Text>
+                    )}
+                  </Text>
+                </View>
+              )}
             </LinearGradient>
 
             {/* =========================================
@@ -308,12 +475,12 @@ export default function TransferMoneyScreen() {
               </Text>
 
               <TouchableOpacity
-  activeOpacity={0.75}
-  style={styles.addBeneficiaryButton}
-  onPress={() =>
-    router.push("/beneficiaries" as any)
-  }
->
+        activeOpacity={0.75}
+        style={styles.addBeneficiaryButton}
+        onPress={() =>
+          router.push("/beneficiaries" as any)
+        }
+      >
                 <Ionicons
                   name="add"
                   size={16}
@@ -343,10 +510,10 @@ export default function TransferMoneyScreen() {
                     key={beneficiary.id}
                     activeOpacity={0.8}
                     onPress={() =>
-  selectBeneficiary(
-    beneficiary
-  )
-}
+          selectBeneficiary(
+            beneficiary
+          )
+        }
                     style={[
                       styles.beneficiaryCard,
                       selected &&
@@ -424,6 +591,9 @@ export default function TransferMoneyScreen() {
 
               <Text style={styles.noteCounter}>
                 {note.length}/80
+                {profileError && (
+                  <Text style={styles.noteCounterError}> ({profileError})</Text>
+                )}
               </Text>
             </View>
 
@@ -462,9 +632,19 @@ export default function TransferMoneyScreen() {
 
                   <Text style={styles.previewAmount}>
                     ₹
-                    {numericAmount.toLocaleString(
+                    {convertedAmountInr.toLocaleString(
                       "en-IN"
                     )}
+                  </Text>
+                </View>
+
+                <View style={styles.previewRow}>
+                  <Text style={styles.previewLabel}>
+                    Original Amount
+                  </Text>
+
+                  <Text style={styles.previewAmount}>
+                    {amount} {currency}
                   </Text>
                 </View>
 
@@ -477,6 +657,112 @@ export default function TransferMoneyScreen() {
                     FREE
                   </Text>
                 </View>
+              </View>
+            )}
+
+            {/* =========================================
+                          PROFILE & VERIFICATION
+            ========================================= */}
+
+            {!loadingProfile && profile && (
+              <View style={styles.profileCard}>
+                <View style={styles.profileHeader}>
+                  <MaterialCommunityIcons
+                    name="account-circle-outline"
+                    size={18}
+                    color="#2563EB"
+                  />
+
+                  <Text style={styles.profileTitle}>
+                    Your Profile
+                  </Text>
+                </View>
+
+                <View style={styles.profileRow}>
+                  <Text style={styles.profileLabel}>
+                    Email
+                  </Text>
+
+                  <Text style={styles.profileValue}>
+                    {profile.email || "Not available"}
+                  </Text>
+                </View>
+
+                <View style={styles.profileRow}>
+                  <Text style={styles.profileLabel}>
+                    Phone
+                  </Text>
+
+                  <Text style={styles.profileValue}>
+                    {profile.phone_number || "Not available"}
+                  </Text>
+                </View>
+
+                {/* Email Verification Status */}
+                {emailVerification && (
+                  <View style={styles.verificationRow}>
+                    <Text style={styles.verificationLabel}>
+                      Email Verified:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.verificationValue,
+                        emailVerification.verified && styles.verificationValueVerified,
+                        !emailVerification.verified && styles.verificationValueNotVerified,
+                      ]}
+                    >
+                      {emailVerification.checking ? "Checking..." : (emailVerification.verified ? "Yes" : "No")}
+                    </Text>
+                    {!emailVerification.verified && !emailVerification.checking && (
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={styles.verificationActionButton}
+                        onPress={() => {
+                          // Re-verification
+                          setEmailVerification(prev => ({ ...(prev ?? {}), checking: true }));
+                          verificationService.verifyEmail(profile.email ?? "").then(result => {
+                            setEmailVerification({ verified: result.deliverable, checking: false });
+                          });
+                        }}
+                      >
+                        <Text style={styles.verificationActionText}>Re-check</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                {/* Phone Verification Status */}
+                {phoneVerification && (
+                  <View style={styles.verificationRow}>
+                    <Text style={styles.verificationLabel}>
+                      Phone Verified:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.verificationValue,
+                        phoneVerification.verified && styles.verificationValueVerified,
+                        !phoneVerification.verified && styles.verificationValueNotVerified,
+                      ]}
+                    >
+                      {phoneVerification.checking ? "Checking..." : (phoneVerification.verified ? "Yes" : "No")}
+                    </Text>
+                    {!phoneVerification.verified && !phoneVerification.checking && (
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={styles.verificationActionButton}
+                        onPress={() => {
+                          // Re-verification
+                          setPhoneVerification(prev => ({ ...(prev ?? {}), checking: true }));
+                          verificationService.verifyPhone(profile.phone_number ?? "").then(result => {
+                            setPhoneVerification({ verified: result.valid, checking: false });
+                          });
+                        }}
+                      >
+                        <Text style={styles.verificationActionText}>Re-check</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
               </View>
             )}
 

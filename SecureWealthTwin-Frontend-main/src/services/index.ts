@@ -5,3 +5,4 @@ export * from "./goalService";
 export * from "./notificationService";
 export * from "./aiService";
 export * from "./fraudService";
+export * from "./verificationService";
