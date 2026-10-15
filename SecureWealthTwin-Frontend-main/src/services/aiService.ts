@@ -13,7 +13,7 @@ import type {
   change this to false.
 */
 
-const USE_DEMO_AI = true;
+const USE_DEMO_AI = false;
 
 /* =====================================
    SEND MESSAGE

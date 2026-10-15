@@ -220,7 +220,39 @@ class PaymentRequest(BaseModel):
     mule_account_signal: bool = False
     usual_amount: float = Field(default=1000, gt=0)
     context: Literal["payment", "receive", "refund"] = "payment"
+from pydantic import BaseModel, Field
+from typing import Optional, List
 
+class AIChatRequest(BaseModel):
+    message: str
+    conversationId: Optional[str] = None
+
+class AIChatMessage(BaseModel):
+    id: Optional[str] = None
+    role: Optional[str] = None
+    text: str
+    createdAt: Optional[str] = None
+
+class AIInsight(BaseModel):
+    title: str
+    value: str
+    subtitle: str
+    type: str
+    confidence: Optional[int] = None
+
+class AIChatResponse(BaseModel):
+    conversationId: Optional[str] = None
+    message: AIChatMessage
+    insight: Optional[AIInsight] = None
+
+class AIHistoryItem(BaseModel):
+    id: str
+    title: str
+    preview: str
+    updatedAt: str
+
+class AIChatHistoryResponse(BaseModel):
+    conversations: List[AIHistoryItem]
 
 def row_dict(row):
     return dict(row) if row is not None else None
@@ -428,3 +460,114 @@ def fraud_history(limit: int = Query(default=50, ge=1, le=200)):
         item["response"] = json.loads(item.pop("response_json"))
         result.append(item)
     return {"assessments": result, "count": len(result), "data_source": "sqlite"}
+
+
+# AI Chat Endpoints
+@app.post("/ai/chat")
+async def ai_chat_endpoint(request: AIChatRequest):
+    """AI chat endpoint that provides financial insights based on user message"""
+    # Simple rule-based responses for demo purposes
+    message = request.message.lower()
+
+    # Default response
+    response_text = "I'm here to help you with your financial questions. How can I assist you today?"
+    insight = None
+
+    # Check for keywords to provide specific insights
+    if any(word in message for word in ["spend", "spending", "expense", "expenses"]):
+        response_text = "Based on your recent transactions, your spending has been relatively stable this month. You've spent approximately ₹2,400 on groceries and ₹1,800 on dining out."
+        insight = {
+            "title": "Monthly Spending Analysis",
+            "value": "₹4,200",
+            "subtitle": "Total expenses this month",
+            "type": "expense",
+            "confidence": 85
+        }
+    elif any(word in message for word in ["income", "earn", "salary"]):
+        response_text = "Your income shows a steady pattern with regular monthly deposits. Your average monthly income is approximately ₹45,000."
+        insight = {
+            "title": "Income Stability",
+            "value": "₹45,000/month",
+            "subtitle": "Average monthly income",
+            "type": "income",
+            "confidence": 90
+        }
+    elif any(word in message for word in ["invest", "investment", "save", "savings"]):
+        response_text = "Considering your current expenses and income, you have the capacity to save approximately ₹15,000 per month, which could be allocated to investments."
+        insight = {
+            "title": "Investment Capacity",
+            "value": "₹15,000",
+            "subtitle": "Available for monthly investment",
+            "type": "investment",
+            "confidence": 80
+        }
+    elif any(word in message for word in ["fraud", "security", "security", "protect"]):
+        response_text = "Your Twin Shield security score is strong at 85/100. No suspicious activity has been detected in your recent transactions."
+        insight = {
+            "title": "Security Score",
+            "value": "85/100",
+            "subtitle": "Twin Shield protection level",
+            "type": "security",
+            "confidence": 95
+        }
+    elif any(word in message for word in ["goal", "goals", "target"]):
+        response_text = "You're making good progress toward your financial goals. Your emergency fund goal is 70% complete, and your vacation savings goal is 45% complete."
+        insight = {
+            "title": "Goal Progress",
+            "value": "70%",
+            "subtitle": "Emergency fund completion",
+            "type": "goal",
+            "confidence": 88
+        }
+
+    # Create response
+    ai_message = AIChatMessage(
+        id=str(uuid.uuid4()),
+        role="assistant",
+        text=response_text,
+        createdAt=now_iso()
+    )
+
+    ai_insight = None
+    if insight:
+        ai_insight = AIInsight(
+            title=insight["title"],
+            value=insight["value"],
+            subtitle=insight["subtitle"],
+            type=insight["type"],
+            confidence=insight["confidence"]
+        )
+
+    return AIChatResponse(
+        conversationId=request.conversationId or str(uuid.uuid4()),
+        message=ai_message,
+        insight=ai_insight
+    )
+
+
+@app.get("/ai/chat/history")
+def ai_chat_history_endpoint():
+    """Get AI chat conversation history"""
+    # Return dummy history for demo
+    history_items = [
+        AIHistoryItem(
+            id="conv1",
+            title="Spending Analysis Discussion",
+            preview="We discussed your monthly spending patterns and identified opportunities for optimization.",
+            updatedAt=now_iso()
+        ),
+        AIHistoryItem(
+            id="conv2",
+            title="Investment Planning Session",
+            preview="We explored investment options based on your risk profile and financial goals.",
+            updatedAt=now_iso()
+        ),
+        AIHistoryItem(
+            id="conv3",
+            title="Security Review Conversation",
+            preview="We reviewed your Twin Shield security settings and recent transaction safety.",
+            updatedAt=now_iso()
+        )
+    ]
+
+    return AIChatHistoryResponse(conversations=history_items)
