@@ -99,7 +99,7 @@ def _firebase_app():
             raise FirebaseAdminUnavailable("Firebase Admin is not configured.") from error
 
 
-def _verify_firebase_id_token(authorization: str) -> str:
+def _verify_firebase_id_token(authorization: str) -> dict:
     if not authorization.startswith("Bearer "):
         raise InvalidFirebaseCredentials("Bearer authorization is required.")
 
@@ -122,10 +122,7 @@ def _verify_firebase_id_token(authorization: str) -> str:
         logger.info("Firebase ID-token verification failed: %s", type(error).__name__)
         raise InvalidFirebaseCredentials("Invalid Firebase ID token.") from error
 
-    uid = decoded.get("uid")
-    if not isinstance(uid, str) or not uid:
-        raise InvalidFirebaseCredentials("Firebase ID token has no user identity.")
-    return uid
+    return decoded
 
 
 def require_firebase_user(
@@ -138,7 +135,11 @@ def require_firebase_user(
         )
 
     try:
-        return _verify_firebase_id_token(authorization)
+        decoded_token = _verify_firebase_id_token(authorization)
+        uid = decoded_token.get("uid")
+        if not isinstance(uid, str) or not uid:
+            raise InvalidFirebaseCredentials("Firebase ID token has no user identity.")
+        return uid
     except FirebaseAdminUnavailable as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -160,7 +161,11 @@ def optional_firebase_user(authorization: str | None) -> str | None:
     if not authorization:
         return None
     try:
-        return _verify_firebase_id_token(authorization)
+        decoded_token = _verify_firebase_id_token(authorization)
+        uid = decoded_token.get("uid")
+        if not isinstance(uid, str) or not uid:
+            raise InvalidFirebaseCredentials("Firebase ID token has no user identity.")
+        return uid
     except (FirebaseAdminUnavailable, InvalidFirebaseCredentials):
         return None
 

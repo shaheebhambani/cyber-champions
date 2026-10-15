@@ -15,6 +15,7 @@ try:  # Supports both `uvicorn main:app` from BACKEND and `uvicorn BACKEND.main:
         notification_router,
         optional_firebase_user,
         send_suspicious_fraud_alert,
+        _verify_firebase_id_token,
     )
 except ImportError:  # pragma: no cover - exercised by direct-module startup.
     from fcm_notifications import (
@@ -22,7 +23,18 @@ except ImportError:  # pragma: no cover - exercised by direct-module startup.
         notification_router,
         optional_firebase_user,
         send_suspicious_fraud_alert,
+        _verify_firebase_id_token,
     )
+
+# Import new service modules
+try:
+    from .currency_service import get_exchange_rate, convert_amount
+    from .email_verification_service import verify_email, is_email_deliverable
+    from .phone_verification_service import verify_phone_number, is_valid_phone_number
+except ImportError:  # pragma: no cover - exercised by direct-module startup.
+    from currency_service import get_exchange_rate, convert_amount
+    from email_verification_service import verify_email, is_email_deliverable
+    from phone_verification_service import verify_phone_number, is_valid_phone_number
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "securewealth.db"
@@ -94,6 +106,80 @@ init_notification_storage(DB_PATH)
 app.include_router(notification_router)
 
 
+# Currency Exchange Rates Endpoints
+@app.get("/api/v1/exchange-rate/{base_currency}/{target_currency}")
+async def exchange_rate_endpoint(base_currency: str, target_currency: str):
+    """Get exchange rate from base_currency to target_currency"""
+    rate = await get_exchange_rate(base_currency, target_currency)
+    if rate is None:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Unable to fetch exchange rate for {base_currency} to {target_currency}"
+        )
+    return {
+        "base_currency": base_currency.upper(),
+        "target_currency": target_currency.upper(),
+        "rate": rate,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
+@app.get("/api/v1/convert/{amount}/{base_currency}/{target_currency}")
+async def convert_endpoint(amount: float, base_currency: str, target_currency: str):
+    """Convert amount from base_currency to target_currency"""
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+
+    converted = await convert_amount(amount, base_currency, target_currency)
+    if converted is None:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Unable to convert {amount} {base_currency} to {target_currency}"
+        )
+
+    return {
+        "original_amount": amount,
+        "original_currency": base_currency.upper(),
+        "converted_amount": converted,
+        "target_currency": target_currency.upper(),
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
+# Email Verification Endpoints
+@app.post("/api/v1/verify-email")
+async def verify_email_endpoint(email: dict):
+    """Verify email address using Mailboxlayer API"""
+    email_address = email.get("email")
+    if not email_address:
+        raise HTTPException(status_code=400, detail="Email address is required")
+
+    result = await verify_email(email_address)
+    return {
+        "email": result["email"],
+        "deliverable": result["format_valid"] and result["mx_found"],
+        "verification_details": result
+    }
+
+
+# Phone Verification Endpoints
+@app.post("/api/v1/verify-phone")
+async def verify_phone_endpoint(phone_data: dict):
+    """Verify phone number using Numverify API"""
+    phone_number = phone_data.get("phone_number")
+    country_code = phone_data.get("country_code")
+
+    if not phone_number:
+        raise HTTPException(status_code=400, detail="Phone number is required")
+
+    result = await verify_phone_number(phone_number, country_code)
+    return {
+        "phone_number": result["number"],
+        "valid": result["valid"],
+        "verification_details": result
+    }
+
+
 class TransactionCreate(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     category: str = Field(default="Other", max_length=80)
@@ -143,6 +229,36 @@ def row_dict(row):
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "SecureWealth Twin API", "database": "sqlite", "timestamp": now_iso()}
+
+
+@app.get("/profile")
+async def profile_endpoint(authorization: str | None = Header(default=None)):
+    """Get the user's profile information from Firebase ID token."""
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Firebase authentication is required.",
+        )
+    try:
+        decoded_token = _verify_firebase_id_token(authorization)
+        email = decoded_token.get("email")
+        phone_number = decoded_token.get("phone_number")
+        # Firebase returns phone_number in E.164 format if available
+        return {
+            "email": email,
+            "phone_number": phone_number,
+            "uid": decoded_token.get("uid"),
+        }
+    except FirebaseAdminUnavailable as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Profile authentication is temporarily unavailable.",
+        ) from error
+    except InvalidFirebaseCredentials as error:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Firebase authentication.",
+        ) from error
 
 
 @app.get("/transactions")
