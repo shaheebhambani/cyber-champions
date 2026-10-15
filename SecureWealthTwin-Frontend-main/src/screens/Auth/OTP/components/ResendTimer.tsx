@@ -1,0 +1,1 @@
+import React,{useState,useEffect} from "react";import {Text} from "react-native";export default function ResendTimer(){const[s,setS]=useState(30);useEffect(()=>{if(!s)return;const i=setInterval(()=>setS(v=>v-1),1000);return()=>clearInterval(i)},[s]);return <Text style={{marginTop:24,textAlign:"center"}}>{s?`Resend OTP in ${s}s`:"You can resend OTP now."}</Text>}
