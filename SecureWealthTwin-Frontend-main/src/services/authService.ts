@@ -1,4 +1,5 @@
 import { apiClient, ENDPOINTS } from "@/api";
+import type { UserProfile } from "@/types/user";
 
 export const authService = {
   login: async (data: unknown) => {
@@ -17,6 +18,11 @@ export const authService = {
       data
     );
 
+    return response.data;
+  },
+
+  getProfile: async () => {
+    const response = await apiClient.get<UserProfile>(ENDPOINTS.PROFILE);
     return response.data;
   },
 };

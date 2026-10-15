@@ -20,9 +20,14 @@ export default function ReviewTransferScreen() {
     beneficiaryBank?: string;
     beneficiaryAccount?: string;
     note?: string;
+    beneficiaryId?: string;
+    originalAmount?: string;
+    originalCurrency?: string;
   }>();
 
   const amount = Number(params.amount ?? 0);
+  const originalAmount = Number(params.originalAmount ?? 0);
+  const originalCurrency = params.originalCurrency ?? "INR";
 
   const beneficiaryName =
     params.beneficiaryName ?? "Beneficiary";
@@ -32,6 +37,8 @@ export default function ReviewTransferScreen() {
 
   const beneficiaryAccount =
     params.beneficiaryAccount ?? "••••";
+  const beneficiaryId =
+    params.beneficiaryId ?? "";
 
   const note =
     params.note && params.note.length > 0
@@ -40,13 +47,16 @@ export default function ReviewTransferScreen() {
 
   const handleConfirm = () => {
     router.push({
-      pathname: "/transfer/security-check",
+      pathname: "/transfer/fraud-check",
       params: {
         amount: amount.toString(),
         beneficiaryName,
         beneficiaryBank,
         beneficiaryAccount,
         note,
+        beneficiaryId,
+        originalAmount: originalAmount.toString(),
+        originalCurrency,
       },
     } as any);
   };
