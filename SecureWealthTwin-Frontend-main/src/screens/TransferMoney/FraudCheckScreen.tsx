@@ -217,6 +217,7 @@ export default function FraudCheckScreen() {
                       beneficiaryBank,
                       beneficiaryAccount,
                       note,
+                      beneficiaryId,
                       riskScore: risk_score.toString(),
                       riskLevel: risk_level,
                     },

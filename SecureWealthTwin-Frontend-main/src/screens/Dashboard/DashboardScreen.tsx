@@ -64,7 +64,7 @@ const getRecords = (response: any): AnyRecord[] => {
   }
 
   if (Array.isArray(response?.data?.transactions)) {
-    return response.data.transactions;
+    return response.data?.transactions;
   }
 
   if (Array.isArray(response?.items)) {
@@ -208,6 +208,11 @@ export default function DashboardScreen() {
       label: "Transfer",
       icon: "bank-transfer" as const,
       route: "/transfer",
+    },
+    {
+      label: "Currency",
+      icon: "currency-usd" as const,
+      route: "/currency-converter",
     },
     {
       label: "Scan QR",
@@ -886,7 +891,10 @@ export default function DashboardScreen() {
                     flexDirection: "row",
                     alignItems: "center",
                     paddingVertical: 15,
-                    borderBottomWidth: index === Math.min(recentTransactions.length, 5) - 1 ? 0 : 1,
+                    borderBottomWidth:
+                      index === Math.min(recentTransactions.length, 5) - 1
+                        ? 0
+                        : 1,
                     borderBottomColor: COLORS.border,
                   }}
                 >

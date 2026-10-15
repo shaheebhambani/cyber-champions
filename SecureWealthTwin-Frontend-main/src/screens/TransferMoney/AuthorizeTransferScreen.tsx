@@ -163,45 +163,39 @@ export default function AuthorizeTransferScreen() {
     }
   };
 
+  const handleOTP = () => {
   const processTransfer = async () => {
     setAuthState("processing");
-
-    /*
-      IMPORTANT:
-
-      This delay represents the backend transfer request.
-
-      Later replace this with something like:
-
-      await transactionService.transfer({
-        amount,
-        beneficiaryId,
-        note
-      });
-
-      The backend/banking API must determine whether
-      the real transfer actually succeeds.
-    */
-
-    await new Promise((resolve) =>
-      setTimeout(resolve, 1800)
-    );
-
-    router.replace({
-      pathname: "/transfer/success",
-
-      params: {
-        amount: amount.toString(),
-        beneficiaryName,
-        beneficiaryBank,
-        beneficiaryAccount,
-        note,
-        riskScore,
-      },
-    } as any);
+    try {
+      const transactionData = {
+        title: `Transfer to ${beneficiaryName}`,
+        category: "Transfer",
+        amount: amount,
+        type: "expense" as const,
+        status: "Completed" as const,
+        note: note,
+      };
+      await transactionService.createTransaction(transactionData);
+      router.replace({
+        pathname: "/transfer/success",
+        params: {
+          amount: amount.toString(),
+          beneficiaryName,
+          beneficiaryBank,
+          beneficiaryAccount,
+          note,
+          riskScore,
+        },
+      } as any);
+    } catch (err: any) {
+      console.error("Transaction creation error:", err);
+      Alert.alert(
+        "Transfer Failed",
+        err?.response?.data?.message || err?.message || "Failed to create transaction. Please try again."
+      );
+      setAuthState("ready");
+    }
   };
-
-  const handleOTP = () => {
     /*
       We'll reuse your OTP architecture later.
 
