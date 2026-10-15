@@ -9,12 +9,20 @@ from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from fcm_notifications import (
-    init_notification_storage,
-    notification_router,
-    optional_firebase_user,
-    send_suspicious_fraud_alert,
-)
+try:  # Supports both `uvicorn main:app` from BACKEND and `uvicorn BACKEND.main:app`.
+    from .fcm_notifications import (
+        init_notification_storage,
+        notification_router,
+        optional_firebase_user,
+        send_suspicious_fraud_alert,
+    )
+except ImportError:  # pragma: no cover - exercised by direct-module startup.
+    from fcm_notifications import (
+        init_notification_storage,
+        notification_router,
+        optional_firebase_user,
+        send_suspicious_fraud_alert,
+    )
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "securewealth.db"

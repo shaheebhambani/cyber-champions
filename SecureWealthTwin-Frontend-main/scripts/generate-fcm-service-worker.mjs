@@ -26,8 +26,8 @@ function loadEnvironmentFile(fileName) {
 
 // Expo reads these at app-bundle time. The service worker is a standalone file, so
 // load the same local files here without adding configuration to source control.
-loadEnvironmentFile(".env");
 loadEnvironmentFile(".env.local");
+loadEnvironmentFile(".env");
 
 const firebaseConfig = Object.fromEntries(
   Object.entries(requiredEnvironment).map(([configKey, environmentKey]) => [
